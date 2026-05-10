@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ row["headline"] or "Brief" }} — Clinical News Bot{% endblock %}
+{% block content %}
+<article class="brief">
+  <div class="brief-meta">
+    <span class="date">{{ row["ran_at"][:10] }}</span>
+    <span>·</span>
+    <span>{{ row["article_count"] }} articles</span>
+    <span>·</span>
+    <span>{{ row["cluster_count"] }} clusters</span>
+    <span>·</span>
+    <span>{{ row["word_count"] }} words</span>
+    {% if row["citation_coverage"] is not none %}
+      <span>·</span>
+      <span>citation coverage {{ "{:.0%}".format(row["citation_coverage"]) }}</span>
+    {% endif %}
+  </div>
+
+  {{ body_html | safe }}
+
+  <div class="brief-downloads">
+    <a class="btn" href="/briefs/{{ row['id'] }}.md">Download Markdown</a>
+    <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+</article>
+{% endblock %}

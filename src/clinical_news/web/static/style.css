@@ -1,0 +1,284 @@
+:root {
+  --bg: #fbfaf7;
+  --fg: #1f1d1a;
+  --muted: #6b6862;
+  --accent: #2f5c8a;
+  --line: #e6e3dc;
+  --warn: #b76e00;
+  --bad: #b03030;
+  --good: #2f7a3a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+main {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--line);
+  padding: 14px 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+  background: white;
+}
+
+.site-header .brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.site-header nav { display: flex; gap: 16px; }
+.site-header nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.site-header nav a:hover { color: var(--fg); }
+
+.site-footer {
+  text-align: center;
+  color: var(--muted);
+  padding: 30px 20px;
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+}
+
+a { color: var(--accent); }
+
+/* Library */
+.briefs {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+.briefs th, .briefs td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.briefs th { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.briefs td.num, .briefs th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.briefs td.date { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.badge-ok { background: #e7f4ea; color: var(--good); }
+.badge-needs_review { background: #fdf0d6; color: var(--warn); }
+.badge-failed { background: #fbe1e1; color: var(--bad); }
+.badge-skipped_insufficient { background: var(--line); color: var(--muted); }
+
+.pagination {
+  margin-top: 20px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  color: var(--muted);
+}
+
+/* Brief */
+.brief-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.brief-headline {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin: 8px 0 12px;
+}
+.brief-deck {
+  font-size: 1.15rem;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: 0 0 28px;
+}
+.brief-body h2 {
+  margin-top: 36px;
+  font-size: 1.4rem;
+}
+.brief-body p { margin: 14px 0; }
+.brief-body sup .cite {
+  text-decoration: none;
+  color: var(--accent);
+  padding: 0 2px;
+}
+.sources-heading {
+  margin-top: 48px;
+  font-size: 1.2rem;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.sources {
+  font-size: 0.92rem;
+  padding-left: 22px;
+}
+.sources li { margin: 8px 0; }
+.sources .src {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.sources .date { color: var(--muted); }
+
+.brief-downloads {
+  margin-top: 40px;
+  display: flex;
+  gap: 12px;
+}
+.btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.empty { color: var(--muted); }
+
+/* Search */
+.search-form input[type=text] {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+}
+.search-filters {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.search-filters label {
+  font-size: 0.88rem;
+  color: var(--muted);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.search-filters input[type=date],
+.search-filters select {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: white;
+  font: inherit;
+}
+.search-filters button {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.search-filters button:hover { opacity: 0.92; }
+
+.results {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 28px;
+}
+.results li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.results .date, .results .src {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-left: 8px;
+}
+.results .src {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.results .excerpt {
+  font-size: 0.92rem;
+  color: var(--fg);
+  margin: 4px 0 0;
+}
+mark { background: #fff7c2; padding: 0 2px; }
+
+.feedback {
+  margin-left: 10px;
+  display: inline-flex;
+  gap: 4px;
+}
+.thumb {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.thumb:hover { border-color: var(--accent); }
+.feedback.marked-relevant .thumb-up { background: #e7f4ea; border-color: var(--good); }
+.feedback.marked-not-relevant .thumb-down { background: #fbe1e1; border-color: var(--bad); }
+
+.generate-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 18px 0 24px;
+  padding: 14px 16px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.btn-primary {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.btn-primary:hover { opacity: 0.92; }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.muted { color: var(--muted); font-size: 0.9rem; }
+
+/* Print: clean output for browser print → PDF */
+@media print {
+  .site-header, .site-footer, .brief-downloads, .feedback { display: none !important; }
+  body { background: white; color: black; }
+  main { padding: 0; max-width: none; }
+  .brief-headline { font-size: 22pt; }
+  .brief-deck { font-size: 12pt; color: #555; }
+  .brief-body h2 { font-size: 14pt; page-break-after: avoid; }
+  .brief-body p { orphans: 3; widows: 3; }
+  .sources-heading { page-break-before: auto; border-top: 0.5pt solid #999; }
+  a { color: black; text-decoration: none; }
+  sup .cite { color: #2f5c8a; }
+}

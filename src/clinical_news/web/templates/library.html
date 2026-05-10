@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Library — Clinical News Bot{% endblock %}
+{% block content %}
+<section class="library">
+  <h1>Brief library</h1>
+
+  <div class="generate-bar" id="generate-bar">
+    <button id="generate-btn"
+            class="btn-primary"
+            hx-post="/admin/generate"
+            hx-trigger="click"
+            hx-swap="none"
+            hx-on::after-request="onGenerateResponse(event)">
+      Generate new brief
+    </button>
+    <span id="generate-status" class="muted"></span>
+  </div>
+
+  <script>
+    const initialLatestId = {{ rows[0]["id"] if rows else "null" }};
+    let pollTimer = null;
+
+    function onGenerateResponse(evt) {
+      const xhr = evt.detail.xhr;
+      const status = document.getElementById("generate-status");
+      const btn = document.getElementById("generate-btn");
+      if (xhr.status === 202) {
+        btn.disabled = true;
+        btn.textContent = "Generating…";
+        status.textContent = " Pipeline started on GitHub Actions. This page will refresh when the new brief lands (typically 5–10 min).";
+        if (pollTimer === null) {
+          pollTimer = setInterval(pollForNewBrief, 20000);
+        }
+      } else if (xhr.status === 401) {
+        status.textContent = " Authentication required.";
+      } else {
+        status.textContent = " Could not dispatch: " + xhr.responseText;
+      }
+    }
+
+    function pollForNewBrief() {
+      fetch("/admin/status", { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data || !data.latest_brief) return;
+          if (initialLatestId === null || data.latest_brief.id !== initialLatestId) {
+            clearInterval(pollTimer);
+            window.location.reload();
+          }
+        })
+        .catch(() => {});
+    }
+  </script>
+  {% if not rows %}
+    <p class="empty">No briefs yet. The first synthesis run will appear here.</p>
+  {% else %}
+    <table class="briefs">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Headline</th>
+          <th class="num">Articles</th>
+          <th class="num">Clusters</th>
+          <th class="num">Words</th>
+          <th class="num">Citation cov.</th>
+          <th>Status</th>
+          <th>Open</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="date">{{ r["ran_at"][:10] }}</td>
+          <td>{{ r["headline"] or "(no headline)" }}</td>
+          <td class="num">{{ r["article_count"] }}</td>
+          <td class="num">{{ r["cluster_count"] or "—" }}</td>
+          <td class="num">{{ r["word_count"] or "—" }}</td>
+          <td class="num">{{ "{:.0%}".format(r["citation_coverage"]) if r["citation_coverage"] is not none else "—" }}</td>
+          <td><span class="badge badge-{{ r['status'] }}">{{ r["status"] }}</span></td>
+          <td><a href="/briefs/{{ r['id'] }}">read →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <nav class="pagination">
+      {% if page > 1 %}<a href="/library?page={{ page - 1 }}">← previous</a>{% endif %}
+      <span>page {{ page }}</span>
+      {% if has_more %}<a href="/library?page={{ page + 1 }}">next →</a>{% endif %}
+    </nav>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,24 @@
+# Cloudflare Tunnel configuration.
+# Copy to ~/.cloudflared/config.yml and edit the placeholders.
+#
+# 1. Create a tunnel:
+#       cloudflared tunnel login
+#       cloudflared tunnel create clinical-news
+#    (this writes ~/.cloudflared/<TUNNEL-ID>.json)
+#
+# 2. Route DNS to the tunnel:
+#       cloudflared tunnel route dns clinical-news clinical-news.example.com
+#
+# 3. Run it:
+#       cloudflared tunnel run clinical-news
+#
+# 4. (Optional) install as a service:
+#       sudo cloudflared service install
+
+tunnel: REPLACE-WITH-TUNNEL-ID
+credentials-file: /home/REPLACE-WITH-USER/.cloudflared/REPLACE-WITH-TUNNEL-ID.json
+
+ingress:
+  - hostname: clinical-news.example.com
+    service: http://localhost:8000
+  - service: http_status:404

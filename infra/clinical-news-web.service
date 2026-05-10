@@ -1,0 +1,19 @@
+# systemd unit for the FastAPI reader UI.
+# Copy to /etc/systemd/system/clinical-news-web.service and run:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now clinical-news-web
+[Unit]
+Description=Clinical News Bot — FastAPI reader UI
+After=network.target
+
+[Service]
+Type=simple
+User=REPLACE-WITH-USER
+WorkingDirectory=/home/REPLACE-WITH-USER/Projects/ClinicalNewsBot
+EnvironmentFile=/home/REPLACE-WITH-USER/Projects/ClinicalNewsBot/.env
+ExecStart=/home/REPLACE-WITH-USER/Projects/ClinicalNewsBot/.venv/bin/clinical-news web --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,216 @@
+# Source registry. Override `active: false` to disable a source without deletion.
+# `bypass_filtering: true` skips the keyword/embedding/LLM gate — reserved for
+# authoritative structured sources where every item is by definition relevant.
+
+# ------------------------------------------------------------
+# Authoritative structured sources (bypass filtering)
+# ------------------------------------------------------------
+- id: ctgov-recent
+  name: ClinicalTrials.gov — Recently Updated
+  source_type: registry
+  api_url: https://clinicaltrials.gov/api/v2/studies
+  extraction_strategy: api_native
+  bypass_filtering: true
+  active: true
+
+- id: pubmed-trials
+  name: PubMed — Clinical Trials & RCTs
+  source_type: journal
+  api_url: https://eutils.ncbi.nlm.nih.gov/entrez/eutils
+  extraction_strategy: api_native
+  bypass_filtering: true
+  active: true
+
+- id: fda-press
+  name: FDA — Press Announcements
+  source_type: regulator
+  rss_url: https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml
+  extraction_strategy: jina_reader
+  bypass_filtering: true
+  active: true
+
+- id: ema-news
+  name: EMA — News
+  source_type: regulator
+  rss_url: https://www.ema.europa.eu/en/news.xml
+  extraction_strategy: jina_reader
+  bypass_filtering: true
+  active: true
+
+- id: retraction-watch
+  name: Retraction Watch
+  source_type: retraction
+  rss_url: https://retractionwatch.com/feed/
+  extraction_strategy: jina_reader
+  bypass_filtering: true
+  active: true
+
+# ------------------------------------------------------------
+# Industry / trade publications — go through the full filter chain.
+# ------------------------------------------------------------
+- id: clinical-trials-arena
+  name: Clinical Trials Arena
+  source_type: newspaper
+  rss_url: https://www.clinicaltrialsarena.com/feed/
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: true
+
+- id: endpoints-news
+  name: Endpoints News
+  source_type: newspaper
+  rss_url: https://endpoints.news/feed/
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: true
+
+# Applied Clinical Trials Online: their WAF blocks programmatic feed access
+# (403 on /feed, /rss, /?feed=rss2). Left disabled until a working ingest path
+# is found — manual export or RSS via a third-party aggregator could work.
+- id: applied-clinical-trials
+  name: Applied Clinical Trials Online
+  source_type: newspaper
+  rss_url: https://www.appliedclinicaltrialsonline.com/feed
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: false
+
+# Note: the FDA "clinical trials guidance documents" page
+# (https://www.fda.gov/science-research/clinical-trials-and-human-subject-protection/
+#  clinical-trials-guidance-documents) is a static reference index, not a news
+# feed. Use the existing `fda-press` source above for FDA announcements.
+
+# ------------------------------------------------------------
+# Newspapers — these go through the full filter chain.
+# Paywalled ones use rss_snippet_only; replace with your real list as needed.
+# ------------------------------------------------------------
+- id: guardian-health
+  name: The Guardian — Health
+  source_type: newspaper
+  rss_url: https://www.theguardian.com/society/health/rss
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: true
+
+- id: bbc-health
+  name: BBC News — Health
+  source_type: newspaper
+  rss_url: https://feeds.bbci.co.uk/news/health/rss.xml
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: true
+
+- id: nyt-health
+  name: New York Times — Health
+  source_type: newspaper
+  rss_url: https://rss.nytimes.com/services/xml/rss/nyt/Health.xml
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: true
+
+# Reuters / AP / WaPo / Bloomberg / Telegraph / WSJ have all either killed
+# public RSS or WAF-block automated fetchers. We replace them with a single
+# Google News RSS aggregator that captures coverage from all major outlets.
+- id: gnews-clinical-trials
+  name: Google News — clinical trials & FDA approvals (aggregator)
+  source_type: newspaper
+  rss_url: https://news.google.com/rss/search?q=%22clinical+trial%22+OR+%22FDA+approval%22+OR+%22EMA+approval%22+OR+%22phase+3%22+OR+%22phase+2%22&hl=en&gl=US&ceid=US:en
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: true
+
+- id: reuters-health
+  name: Reuters — Health
+  source_type: newspaper
+  rss_url: https://www.reutersagency.com/feed/?best-topics=health&post_type=best
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: false  # public RSS discontinued; covered via gnews-clinical-trials
+
+- id: ap-health
+  name: Associated Press — Health
+  source_type: newspaper
+  rss_url: https://apnews.com/hub/health.rss
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: false  # RSS endpoint 404; covered via gnews-clinical-trials
+
+- id: wapo-health
+  name: Washington Post — Health
+  source_type: newspaper
+  rss_url: https://feeds.washingtonpost.com/rss/national/health
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: false  # RSS endpoint redirect-loops; paywalled body anyway
+
+- id: stat-news
+  name: STAT News
+  source_type: newspaper
+  rss_url: https://www.statnews.com/feed/
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: true
+
+- id: ft-health
+  name: Financial Times — Health
+  source_type: newspaper
+  rss_url: https://www.ft.com/health?format=rss
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: true
+
+- id: bloomberg-health
+  name: Bloomberg — Health
+  source_type: newspaper
+  rss_url: https://feeds.bloomberg.com/health/news.rss
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: false  # RSS endpoint 404; covered via gnews-clinical-trials
+
+- id: npr-health
+  name: NPR — Health
+  source_type: newspaper
+  rss_url: https://feeds.npr.org/1128/rss.xml
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: true
+
+- id: independent-health
+  name: The Independent — Health
+  source_type: newspaper
+  rss_url: https://www.independent.co.uk/life-style/health-and-families/rss
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: true
+
+- id: telegraph-health
+  name: The Telegraph — Health
+  source_type: newspaper
+  rss_url: https://www.telegraph.co.uk/health/rss.xml
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: false  # WAF blocks; covered via gnews-clinical-trials
+
+- id: latimes-science
+  name: LA Times — Science
+  source_type: newspaper
+  rss_url: https://www.latimes.com/science/rss2.0.xml
+  paywalled: false
+  extraction_strategy: jina_reader
+  active: true
+
+- id: wsj-health
+  name: Wall Street Journal — Health
+  source_type: newspaper
+  rss_url: https://feeds.a.dj.com/rss/RSSHealth.xml
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: false  # WAF blocks; covered via gnews-clinical-trials
+
+- id: economist-science
+  name: The Economist — Science & Technology
+  source_type: newspaper
+  rss_url: https://www.economist.com/science-and-technology/rss.xml
+  paywalled: true
+  extraction_strategy: rss_snippet_only
+  active: true

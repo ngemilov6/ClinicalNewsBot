@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Search — Clinical News Bot{% endblock %}
+{% block content %}
+<section class="search">
+  <h1>Search</h1>
+  <form method="get" action="/search" class="search-form">
+    <input type="text" name="q" value="{{ q }}" placeholder="search briefs and source articles…" autofocus>
+    <div class="search-filters">
+      <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+      <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+      <label>Source
+        <select name="source">
+          <option value="">— any —</option>
+          {% for s in sources %}
+            <option value="{{ s['id'] }}" {% if s['id'] == source_id %}selected{% endif %}>{{ s["name"] }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if ran %}
+    {% if brief_results %}
+      <h2>Briefs ({{ brief_results | length }})</h2>
+      <ul class="results briefs-results">
+        {% for r in brief_results %}
+          <li>
+            <a href="/briefs/{{ r['id'] }}"><strong>{{ r["headline"] or "(untitled)" }}</strong></a>
+            <span class="date">{{ r["ran_at"][:10] }}</span>
+            {% if r["excerpt"] %}<p class="excerpt">{{ r["excerpt"] | safe }}</p>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if article_results %}
+      <h2>Source articles ({{ article_results | length }})</h2>
+      <ul class="results articles-results">
+        {% for a in article_results %}
+          <li id="art-{{ a['id'] }}">
+            <a href="{{ a['url'] }}" target="_blank" rel="noopener"><strong>{{ a["title"] }}</strong></a>
+            <span class="src">{{ a["source_id"] }}</span>
+            <span class="date">{{ a["published_at"][:10] }}</span>
+            <span class="feedback" data-id="{{ a['id'] }}">
+              <button class="thumb thumb-up"
+                      hx-post="/admin/feedback/{{ a['id'] }}"
+                      hx-vals='{"label":"relevant"}'
+                      hx-swap="none"
+                      hx-on::after-request="this.parentElement.classList.add('marked-relevant')"
+                      title="Mark as relevant">👍</button>
+              <button class="thumb thumb-down"
+                      hx-post="/admin/feedback/{{ a['id'] }}"
+                      hx-vals='{"label":"not_relevant"}'
+                      hx-swap="none"
+                      hx-on::after-request="this.parentElement.classList.add('marked-not-relevant')"
+                      title="Mark as not relevant">👎</button>
+            </span>
+            {% if a["excerpt"] %}<p class="excerpt">{{ a["excerpt"] | safe }}</p>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    {% if not brief_results and not article_results %}
+      <p class="empty">No results for <em>{{ q }}</em>.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

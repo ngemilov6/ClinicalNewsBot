@@ -1,0 +1,15 @@
+# Vercel reads this file to install the runtime for the web UI.
+# Heavy pipeline deps (feedparser, trafilatura, sklearn, google-generativeai,
+# anthropic) run only on GitHub Actions and are NOT needed here — keeping
+# this lean keeps the cold start fast and stays under Vercel's 250 MB limit.
+
+httpx>=0.27
+pydantic>=2.7
+pyyaml>=6.0
+click>=8.1
+python-dotenv>=1.0
+fastapi>=0.110
+jinja2>=3.1
+markdown>=3.6
+python-multipart>=0.0.9
+libsql-experimental>=0.0.49
