@@ -1,22 +1,23 @@
 """Database layer.
 
-Two backends, picked by env:
+Three modes, picked by env:
 
-- ``TURSO_DATABASE_URL`` set → libsql client (Turso / remote SQLite). Used for
-  Vercel + GitHub Actions deployments.
-- otherwise → local SQLite file at ``Settings.db_path``. Used for local dev
-  and Cloudflare-Tunnel-from-laptop deployments.
+- ``TURSO_DATABASE_URL`` + ``TURSO_EMBEDDED_PATH`` set → **embedded replica**:
+  libsql opens a local SQLite file (path from ``TURSO_EMBEDDED_PATH``) that
+  syncs to Turso. Reads + writes are local; ``sync()`` pushes/pulls. This is
+  what the GitHub Actions worker uses: long-running pipeline writes against
+  the local file, then a single sync at exit ships everything to Turso. No
+  Hrana stream timeouts because nothing streams.
+- ``TURSO_DATABASE_URL`` alone → **HTTP mode**: each call hits Turso directly.
+  Used by the Vercel reader: short-lived single-shot queries that never
+  outlive a stream.
+- neither set → **local SQLite** at ``Settings.db_path``. Used for local dev.
 
-Both speak SQLite SQL — same schema, same queries, same FTS5.
+All three speak SQLite SQL — same schema, same queries, same FTS5.
 
 The libsql client doesn't support ``Connection.row_factory``, so we wrap any
 cursor returned to the caller with one that yields ``Row`` objects supporting
 ``row["col"]`` and ``row[idx]`` access (matching sqlite3.Row).
-
-Turso uses the Hrana wire protocol, which expires the per-connection stream
-after ~10s of idle. Long-running ingest holds one connection across many
-HTTP fetches, so stream expiry is routine. The wrapper detects the
-"stream not found" error and transparently reopens the connection.
 """
 from __future__ import annotations
 
@@ -129,10 +130,15 @@ def _is_stream_expired(exc: BaseException) -> bool:
 
 class _ConnectionWrapper:
     """Thin wrapper that yields ``Row``-style cursors and transparently
-    reconnects when the underlying libsql stream expires."""
+    reconnects when the underlying libsql stream expires.
 
-    def __init__(self, factory: Callable[[], Any]) -> None:
+    When ``sync_on_exit`` is set (embedded-replica mode), ``__exit__`` calls
+    ``conn.sync()`` to push local changes to Turso before closing.
+    """
+
+    def __init__(self, factory: Callable[[], Any], sync_on_exit: bool = False) -> None:
         self._factory = factory
+        self._sync_on_exit = sync_on_exit
         self._conn = factory()
 
     def _reopen(self) -> None:
@@ -177,6 +183,15 @@ class _ConnectionWrapper:
     def close(self):
         return self._conn.close()
 
+    def sync(self) -> None:
+        """Embedded-replica only: push local changes to Turso."""
+        if hasattr(self._conn, "sync"):
+            try:
+                self._conn.sync()
+                log.info("turso: synced changes to remote")
+            except Exception as exc:
+                log.warning("turso sync failed", extra={"err": str(exc)})
+
     def __enter__(self):
         return self
 
@@ -186,6 +201,8 @@ class _ConnectionWrapper:
                 self.commit()
             except Exception:
                 pass
+            if self._sync_on_exit:
+                self.sync()
         else:
             self.rollback()
         self.close()
@@ -203,14 +220,35 @@ def _is_turso() -> bool:
 def connect(db_path: str | Path | None = None):
     """Return a connection-like object whose cursors yield Row objects.
 
-    When ``TURSO_DATABASE_URL`` is set, it's used regardless of ``db_path``.
-    The wrapper holds onto the factory so it can transparently reconnect
-    if the libsql Hrana stream expires.
+    Mode picked by environment (see module docstring).
     """
     if _is_turso():
         import libsql_experimental as libsql
         url = os.environ["TURSO_DATABASE_URL"]
         token = os.environ.get("TURSO_AUTH_TOKEN", "")
+        embedded = os.environ.get("TURSO_EMBEDDED_PATH", "").strip()
+
+        if embedded:
+            log.info("db mode: turso embedded-replica", extra={"path": embedded})
+            # Embedded-replica: local file synced to Turso. Used by the worker.
+            embedded_path = Path(embedded)
+            embedded_path.parent.mkdir(parents=True, exist_ok=True)
+
+            def _make_embedded():
+                c = libsql.connect(str(embedded_path), sync_url=url, auth_token=token)
+                # Pull latest state from Turso so we operate on a current copy.
+                try:
+                    c.sync()
+                    log.info("turso: pulled latest from remote",
+                             extra={"path": str(embedded_path)})
+                except Exception as exc:
+                    log.warning("initial turso sync failed", extra={"err": str(exc)})
+                return c
+
+            return _ConnectionWrapper(_make_embedded, sync_on_exit=True)
+
+        log.info("db mode: turso HTTP (no TURSO_EMBEDDED_PATH set)")
+        # Pure HTTP mode: short-lived reads from the Vercel reader.
         return _ConnectionWrapper(lambda: libsql.connect(url, auth_token=token))
 
     # local sqlite

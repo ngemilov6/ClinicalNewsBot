@@ -33,6 +33,11 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
       TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+      # Embedded-replica mode: pipeline writes against a local SQLite file
+      # in the runner, then syncs the whole DB to Turso at exit. Avoids the
+      # Hrana stream-not-found cascade that breaks long-running ingest.
+      # Hardcoded — `${{ runner.temp }}` doesn't expand in job-level env.
+      TURSO_EMBEDDED_PATH: /tmp/clinical-news.db
       CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
       GMAIL_FROM: ${{ secrets.GMAIL_FROM }}
       GMAIL_TO: ${{ secrets.GMAIL_TO }}

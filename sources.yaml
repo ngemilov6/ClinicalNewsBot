@@ -109,15 +109,18 @@
   active: true
 
 # Reuters / AP / WaPo / Bloomberg / Telegraph / WSJ have all either killed
-# public RSS or WAF-block automated fetchers. We replace them with a single
-# Google News RSS aggregator that captures coverage from all major outlets.
+# public RSS or WAF-block automated fetchers. The Google News RSS aggregator
+# *looks* like a workaround but its items are tracking-redirect URLs that
+# Jina Reader refuses to follow (returns 451 Unavailable For Legal Reasons),
+# and trafilatura can't extract content from the redirect pages either.
+# Disabled until we have a path that actually resolves to publisher URLs.
 - id: gnews-clinical-trials
   name: Google News — clinical trials & FDA approvals (aggregator)
   source_type: newspaper
   rss_url: https://news.google.com/rss/search?q=%22clinical+trial%22+OR+%22FDA+approval%22+OR+%22EMA+approval%22+OR+%22phase+3%22+OR+%22phase+2%22&hl=en&gl=US&ceid=US:en
   paywalled: false
   extraction_strategy: jina_reader
-  active: true
+  active: false  # 451 from Jina; tracking-redirect URLs aren't fetchable
 
 - id: reuters-health
   name: Reuters — Health
