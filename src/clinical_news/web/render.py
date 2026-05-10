@@ -59,19 +59,3 @@ def render_brief_html(headline: str, deck: str, body_markdown: str,
     return "\n".join(parts)
 
 
-def article_index_from_db(conn, run_id: int) -> dict[str, dict]:
-    """Reconstruct the {art_NNNNN: meta} index for the brief at run_id."""
-    rows = conn.execute(
-        "SELECT id, source_id, title, url, published_at "
-        "FROM articles WHERE status = 'synthesized' "
-        "AND id IN (SELECT id FROM articles WHERE cluster_id IS NOT NULL)"
-    ).fetchall()
-    return {
-        f"art_{r['id']:05d}": {
-            "source_id": r["source_id"],
-            "title": r["title"],
-            "url": r["url"],
-            "published_at": r["published_at"],
-        }
-        for r in rows
-    }

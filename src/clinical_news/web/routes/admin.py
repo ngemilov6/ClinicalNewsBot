@@ -35,36 +35,40 @@ def post_feedback(
     return Response(status_code=204)
 
 
-@router.post("/synthesize", status_code=202)
-def trigger_synthesize(
+@router.post("/generate", status_code=202)
+def trigger_generate(
     background: BackgroundTasks,
     settings = Depends(get_settings),
     _user: str = Depends(require_admin),
 ):
-    """Local-mode trigger: runs synthesis in the same process. Not used on Vercel."""
-    from clinical_news.pipeline import run_synthesis
-    background.add_task(run_synthesis, settings, dry_run=False)
-    return {"status": "scheduled"}
+    """Run the full ingest → synthesis pipeline.
 
+    Two modes, picked automatically:
 
-@router.post("/generate", status_code=202)
-def trigger_generate(_user: str = Depends(require_admin)):
-    """Fire the GitHub Actions pipeline (ingest → synthesize) for Vercel deploys.
-
-    Required env vars on the server:
-      GH_REPO            owner/repo, e.g. "nikolaemilov/ClinicalNewsBot"
-      GH_DISPATCH_TOKEN  GitHub fine-grained PAT with Actions: Write
-      GH_DISPATCH_EVENT  optional, defaults to "generate"
+    - **Remote** (Vercel / serverless): if ``GH_REPO`` and ``GH_DISPATCH_TOKEN``
+      are set, fire a GitHub ``repository_dispatch`` event so the workflow
+      runs the heavy work on a dedicated runner. This is the only mode that
+      works on Vercel since the function timeout is 60s and the pipeline
+      takes much longer.
+    - **Local** (your laptop / a long-running server): no GitHub config
+      needed. The pipeline runs in-process via a FastAPI background task
+      and the page polls ``/admin/status`` until a new brief lands.
     """
     repo = os.environ.get("GH_REPO", "")
     token = os.environ.get("GH_DISPATCH_TOKEN", "")
-    event = os.environ.get("GH_DISPATCH_EVENT", "generate")
-    if not repo or not token:
-        raise HTTPException(
-            status_code=503,
-            detail="GH_REPO and GH_DISPATCH_TOKEN must be set on the server",
-        )
 
+    if repo and token:
+        return _dispatch_remote(repo, token)
+
+    # Local mode: spawn the pipeline in a background task. The browser polls
+    # /admin/status every 20s and reloads when a new synthesis_runs row appears.
+    from clinical_news.pipeline import run_full_pipeline
+    background.add_task(run_full_pipeline, settings, dry_run=False)
+    return {"status": "scheduled", "mode": "local"}
+
+
+def _dispatch_remote(repo: str, token: str) -> dict:
+    event = os.environ.get("GH_DISPATCH_EVENT", "generate")
     url = f"https://api.github.com/repos/{repo}/dispatches"
     headers = {
         "Accept": "application/vnd.github+json",
@@ -77,7 +81,6 @@ def trigger_generate(_user: str = Depends(require_admin)):
             "triggered_at": datetime.now(timezone.utc).isoformat(),
         },
     }
-
     try:
         resp = httpx.post(url, json=payload, headers=headers, timeout=15)
     except httpx.HTTPError as exc:
@@ -91,8 +94,7 @@ def trigger_generate(_user: str = Depends(require_admin)):
             status_code=502,
             detail=f"GitHub returned {resp.status_code}: {resp.text[:120]}",
         )
-
-    return {"status": "dispatched", "event": event}
+    return {"status": "dispatched", "mode": "remote", "event": event}
 
 
 @router.get("/status")

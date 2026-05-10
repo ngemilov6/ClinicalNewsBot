@@ -5,8 +5,8 @@ error's `retry_delay`. If the error mentions the daily-cap exhaustion, we cool
 until the next midnight Pacific (Google free-tier resets there).
 
 State persists to ``app_data/keypool_state.json`` so cooldowns outlive the
-process — if cron fires `synthesize` and burns through a daily cap, the next
-`ingest` won't waste retries on that same key.
+process — if one run burns through a daily cap, the next won't waste retries
+on the same key.
 """
 from __future__ import annotations
 

@@ -269,6 +269,23 @@ mark { background: #fff7c2; padding: 0 2px; }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 .muted { color: var(--muted); font-size: 0.9rem; }
 
+/* Markdown footnote extension renders into div.footnote — style it like our Sources */
+.brief-body .footnote,
+.brief-body div.footnote {
+  margin-top: 48px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  font-size: 0.92rem;
+}
+.brief-body .footnote hr { display: none; }
+.brief-body .footnote ol { padding-left: 22px; }
+.brief-body .footnote li { margin: 8px 0; }
+.brief-body .footnote a { color: var(--accent); text-decoration: none; word-break: break-word; }
+.brief-body .footnote a:hover { text-decoration: underline; }
+.brief-body sup a.footnote-ref,
+.brief-body sup .cite { color: var(--accent); text-decoration: none; padding: 0 2px; }
+.brief-body a.footnote-backref { color: var(--muted); margin-left: 4px; text-decoration: none; }
+
 /* Print: clean output for browser print → PDF */
 @media print {
   .site-header, .site-footer, .brief-downloads, .feedback { display: none !important; }

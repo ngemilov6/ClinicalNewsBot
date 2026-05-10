@@ -9,8 +9,8 @@ from clinical_news.llm import gemini
 
 log = logging.getLogger(__name__)
 
-PROMPT_PATH = Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "relevance_v1.md"
-PROMPT_VERSION = "relevance_v1"
+PROMPT_PATH = Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "relevance_v2.md"
+PROMPT_VERSION = "relevance_v2"
 
 
 def classify(title: str, summary: str) -> dict:

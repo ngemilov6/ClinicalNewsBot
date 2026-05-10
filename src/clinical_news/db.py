@@ -12,14 +12,22 @@ Both speak SQLite SQL — same schema, same queries, same FTS5.
 The libsql client doesn't support ``Connection.row_factory``, so we wrap any
 cursor returned to the caller with one that yields ``Row`` objects supporting
 ``row["col"]`` and ``row[idx]`` access (matching sqlite3.Row).
+
+Turso uses the Hrana wire protocol, which expires the per-connection stream
+after ~10s of idle. Long-running ingest holds one connection across many
+HTTP fetches, so stream expiry is routine. The wrapper detects the
+"stream not found" error and transparently reopens the connection.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Sequence
+from typing import Any, Callable, Iterator, Sequence
+
+log = logging.getLogger(__name__)
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "sql" / "schema.sql"
 
@@ -29,7 +37,9 @@ ADDITIVE_COLUMNS: list[tuple[str, str, str]] = [
     ("synthesis_runs", "headline", "TEXT"),
     ("synthesis_runs", "deck", "TEXT"),
     ("synthesis_runs", "word_count", "INTEGER"),
-    ("synthesis_runs", "body_md", "TEXT"),  # V2: brief stored in DB, not on disk
+    ("synthesis_runs", "body_md", "TEXT"),         # rendered markdown with [^N] footnotes
+    ("synthesis_runs", "body_md_raw", "TEXT"),     # LLM output with [ref:X] markers
+    ("synthesis_runs", "article_index_json", "TEXT"),  # JSON {ID: {source_id, title, url, published_at}}
 ]
 
 
@@ -110,27 +120,59 @@ class _CursorWrapper:
         return self._row(raw)
 
 
-class _ConnectionWrapper:
-    """Thin wrapper that returns _CursorWrapper-yielding rows for both backends."""
+def _is_stream_expired(exc: BaseException) -> bool:
+    """Detect Turso/libsql Hrana 'stream not found' errors that mean the
+    connection's stream lease lapsed and we just need to reconnect."""
+    msg = str(exc)
+    return "stream not found" in msg or "stream expired" in msg
 
-    def __init__(self, conn) -> None:
-        self._conn = conn
+
+class _ConnectionWrapper:
+    """Thin wrapper that yields ``Row``-style cursors and transparently
+    reconnects when the underlying libsql stream expires."""
+
+    def __init__(self, factory: Callable[[], Any]) -> None:
+        self._factory = factory
+        self._conn = factory()
+
+    def _reopen(self) -> None:
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+        log.info("db: reopening connection (stream expired)")
+        self._conn = self._factory()
+
+    def _retry_on_stream(self, fn):
+        try:
+            return fn()
+        except (ValueError, RuntimeError) as exc:
+            if not _is_stream_expired(exc):
+                raise
+            self._reopen()
+            return fn()
 
     def cursor(self):
+        # Cursors returned to callers don't auto-recover (callers hold them
+        # past method boundaries); use ``execute`` for resilient one-shots.
         return _CursorWrapper(self._conn.cursor())
 
     def execute(self, sql, params=()):
-        return _CursorWrapper(self._conn.cursor().execute(sql, params))
+        return self._retry_on_stream(
+            lambda: _CursorWrapper(self._conn.cursor().execute(sql, params))
+        )
 
     def executescript(self, script: str):
-        # libsql_experimental Connection has executescript; sqlite3 too
-        return self._conn.executescript(script)
+        return self._retry_on_stream(lambda: self._conn.executescript(script))
 
     def commit(self):
-        return self._conn.commit()
+        return self._retry_on_stream(lambda: self._conn.commit())
 
     def rollback(self):
-        return self._conn.rollback()
+        try:
+            return self._conn.rollback()
+        except Exception:
+            return None
 
     def close(self):
         return self._conn.close()
@@ -141,14 +183,11 @@ class _ConnectionWrapper:
     def __exit__(self, exc_type, exc, tb):
         if exc_type is None:
             try:
-                self._conn.commit()
+                self.commit()
             except Exception:
                 pass
         else:
-            try:
-                self._conn.rollback()
-            except Exception:
-                pass
+            self.rollback()
         self.close()
         return False
 
@@ -165,23 +204,27 @@ def connect(db_path: str | Path | None = None):
     """Return a connection-like object whose cursors yield Row objects.
 
     When ``TURSO_DATABASE_URL`` is set, it's used regardless of ``db_path``.
+    The wrapper holds onto the factory so it can transparently reconnect
+    if the libsql Hrana stream expires.
     """
     if _is_turso():
         import libsql_experimental as libsql
         url = os.environ["TURSO_DATABASE_URL"]
         token = os.environ.get("TURSO_AUTH_TOKEN", "")
-        # libsql expects 'libsql://...' for native protocol or '...turso.io' http
-        conn = libsql.connect(url, auth_token=token)
-        return _ConnectionWrapper(conn)
+        return _ConnectionWrapper(lambda: libsql.connect(url, auth_token=token))
 
     # local sqlite
     assert db_path is not None, "db_path required when TURSO_DATABASE_URL unset"
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, isolation_level=None, detect_types=sqlite3.PARSE_DECLTYPES)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return _ConnectionWrapper(conn)
+
+    def _make():
+        c = sqlite3.connect(path, isolation_level=None, detect_types=sqlite3.PARSE_DECLTYPES)
+        c.execute("PRAGMA foreign_keys = ON")
+        c.execute("PRAGMA journal_mode = WAL")
+        return c
+
+    return _ConnectionWrapper(_make)
 
 
 # --------------------------------------------------------------------------

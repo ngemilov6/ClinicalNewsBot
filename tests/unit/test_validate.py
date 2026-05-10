@@ -41,3 +41,23 @@ def test_long_quote_fails():
     result = validate(_synth(body, ["art_001"]), {"art_001"})
     assert not result.ok
     assert result.quote_violations
+
+
+def test_more_than_10_refs_fails():
+    body = "\n\n".join(f"Paragraph cites [ref:art_{i:03d}]." for i in range(1, 12))
+    valid = {f"art_{i:03d}" for i in range(1, 12)}
+    citations = [f"art_{i:03d}" for i in range(1, 12)]
+    result = validate(_synth(body, citations), valid)
+    assert not result.ok
+    assert result.over_ref_cap
+    assert result.distinct_refs == 11
+
+
+def test_exactly_10_refs_ok():
+    body = "\n\n".join(f"Paragraph cites [ref:art_{i:03d}]." for i in range(1, 11))
+    valid = {f"art_{i:03d}" for i in range(1, 11)}
+    citations = [f"art_{i:03d}" for i in range(1, 11)]
+    result = validate(_synth(body, citations), valid)
+    assert result.ok
+    assert not result.over_ref_cap
+    assert result.distinct_refs == 10

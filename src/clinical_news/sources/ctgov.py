@@ -19,6 +19,10 @@ log = logging.getLogger(__name__)
 
 API = "https://clinicaltrials.gov/api/v2/studies"
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+HEADERS = {
+    "User-Agent": "ClinicalNewsBot/0.1 (+research; contact via repo)",
+    "Accept": "application/json",
+}
 
 
 class CTGovAdapter(SourceAdapter):
@@ -36,7 +40,7 @@ class CTGovAdapter(SourceAdapter):
             "sort": "LastUpdatePostDate:desc",  # newest first
         }
         try:
-            resp = httpx.get(API, params=params, timeout=TIMEOUT)
+            resp = httpx.get(API, params=params, timeout=TIMEOUT, headers=HEADERS)
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             raise RuntimeError(f"ctgov API failed: {exc}") from exc

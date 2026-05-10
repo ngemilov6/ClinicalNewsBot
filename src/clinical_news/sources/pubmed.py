@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+HEADERS = {"User-Agent": "ClinicalNewsBot/0.1 (+research; contact via repo)"}
 DEFAULT_TERM = (
     '("clinical trial"[Publication Type] OR "randomized controlled trial"[Publication Type])'
     ' AND ("last 7 days"[edat])'
@@ -35,6 +36,7 @@ class PubMedAdapter(SourceAdapter):
                 "sort": "pub_date",  # newest first; default would be relevance
             },
             timeout=TIMEOUT,
+            headers=HEADERS,
         )
         esearch.raise_for_status()
         ids = esearch.json().get("esearchresult", {}).get("idlist", [])
@@ -46,6 +48,7 @@ class PubMedAdapter(SourceAdapter):
             f"{EUTILS}/efetch.fcgi",
             params={"db": "pubmed", "id": ",".join(ids), "retmode": "xml"},
             timeout=TIMEOUT,
+            headers=HEADERS,
         )
         efetch.raise_for_status()
 

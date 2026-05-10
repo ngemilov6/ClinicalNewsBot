@@ -1,15 +1,17 @@
 """Public read-only routes."""
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from clinical_news.web.deps import get_db
-from clinical_news.web.render import article_index_from_db, render_brief_html
+from clinical_news.web.render import render_brief_html
 
 router = APIRouter()
 
@@ -62,35 +64,66 @@ def library(
 def brief(brief_id: int, request: Request, conn: sqlite3.Connection = Depends(get_db)):
     row = conn.execute(
         "SELECT id, ran_at, headline, deck, output_path, citation_coverage, "
-        "       word_count, status, article_count, cluster_count, body_md "
+        "       word_count, status, article_count, cluster_count, body_md, "
+        "       body_md_raw, article_index_json "
         "FROM synthesis_runs WHERE id = ?",
         (brief_id,),
     ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="brief not found")
 
-    # Prefer the DB column (canonical on Vercel); fall back to the on-disk
-    # markdown for legacy rows that predate the body_md column.
-    content = row["body_md"] or ""
-    if not content and row["output_path"]:
-        try:
-            from pathlib import Path
-            content = Path(row["output_path"]).read_text()
-        except OSError:
-            content = ""
-    body_md = _strip_md_header(content)
+    body_html = _render_brief_body(row)
 
-    article_index = article_index_from_db(conn, brief_id)
-    body_html = render_brief_html(
-        headline=row["headline"] or "",
-        deck=row["deck"] or "",
-        body_markdown=body_md,
-        article_index=article_index,
-    )
     templates = get_templates(request)
     return templates.TemplateResponse(
         request, "brief.html", {"row": row, "body_html": body_html}
     )
+
+
+def _render_brief_body(row) -> str:
+    """Pick the best rendering path for this brief.
+
+    Path A (new briefs): raw markdown + per-brief article index were saved
+    at synthesis time. Render fresh HTML with sup-style footnotes that link
+    to the correct sources.
+
+    Path B (legacy briefs): only the rendered ``[^N]``-footnoted markdown is
+    available. Convert it via the standard markdown library's footnote
+    extension — the Sources block is already inline.
+    """
+    raw = row["body_md_raw"] or ""
+    index_json = row["article_index_json"] or ""
+    if raw and index_json:
+        try:
+            article_index = json.loads(index_json)
+        except json.JSONDecodeError:
+            article_index = {}
+        return render_brief_html(
+            headline=row["headline"] or "",
+            deck=row["deck"] or "",
+            body_markdown=raw,
+            article_index=article_index,
+        )
+
+    # Legacy path: render the full markdown (already has [^N] footnote markers
+    # and an inline ## Sources block — Markdown's footnotes extension wires
+    # them up automatically).
+    content = row["body_md"] or ""
+    if not content and row["output_path"]:
+        try:
+            content = Path(row["output_path"]).read_text()
+        except OSError:
+            content = ""
+    if not content:
+        return "<p>(no content)</p>"
+
+    import markdown as md_lib
+    html = md_lib.markdown(
+        content,
+        extensions=["extra", "sane_lists", "footnotes"],
+    )
+    # Match the wrapper used by render_brief_html so CSS scoped to .brief-body applies.
+    return f'<div class="brief-body">{html}</div>'
 
 
 _FTS_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*")

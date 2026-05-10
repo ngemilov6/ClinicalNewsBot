@@ -15,8 +15,9 @@ from clinical_news.sources.base import NormalizedItem, SourceAdapter
 
 EMBEDDING_LOWER = 0.45  # below: drop
 EMBEDDING_UPPER = 0.65  # above: accept
-LLM_ACCEPT = 0.6
+LLM_ACCEPT = 0.7   # raised from 0.6 — stricter clinical-trial gate
 LLM_REVIEW = 0.4
+MAX_BRIEF_REFS = 10  # hard cap on distinct citations per brief
 
 log = logging.getLogger(__name__)
 
@@ -205,6 +206,19 @@ def run_ingest(settings: Settings) -> None:
                     _log_error(conn, s.id, item.url, "persist", str(exc))
 
 
+def run_full_pipeline(settings: Settings, dry_run: bool = False) -> None:
+    """Run ingest then synthesis. Used by the local "Generate" button.
+
+    On Vercel/GitHub Actions deploys this is invoked by the workflow, not the
+    web layer. On local deploys the FastAPI background task calls this.
+    """
+    log.info("full pipeline: starting ingest")
+    run_ingest(settings)
+    log.info("full pipeline: starting synthesis")
+    run_synthesis(settings, dry_run=dry_run)
+    log.info("full pipeline: done")
+
+
 def run_synthesis(settings: Settings, dry_run: bool = False) -> None:
     from clinical_news.llm import claude
     from clinical_news.synthesize import cluster, meta, render, summarize, validate
@@ -258,6 +272,8 @@ def run_synthesis(settings: Settings, dry_run: bool = False) -> None:
         log.info("synthesis validated", extra={
             "ok": result.ok,
             "coverage": result.citation_coverage,
+            "distinct_refs": result.distinct_refs,
+            "over_ref_cap": result.over_ref_cap,
             "unresolved": result.unresolved,
         })
 
@@ -289,6 +305,7 @@ def run_synthesis(settings: Settings, dry_run: bool = False) -> None:
         body_md = synthesis.get("body_markdown", "") or ""
         word_count = len(body_md.split())
 
+        import json as _json
         run_id = _record_run(
             conn,
             n=len(rows),
@@ -302,6 +319,8 @@ def run_synthesis(settings: Settings, dry_run: bool = False) -> None:
             deck=deck,
             word_count=word_count,
             body_md=markdown,
+            body_md_raw=body_md,
+            article_index_json=_json.dumps(article_index, separators=(",", ":")),
         )
 
         try:
@@ -317,13 +336,16 @@ def _record_run(conn: sqlite3.Connection, *, n: int, n_clusters: int | None,
                 output_path: str | None, coverage: float | None,
                 prompt_version: str | None, model: str | None, status: str,
                 headline: str = "", deck: str = "", word_count: int = 0,
-                body_md: str = "") -> int:
+                body_md: str = "", body_md_raw: str = "",
+                article_index_json: str = "") -> int:
     cur = conn.execute(
         "INSERT INTO synthesis_runs "
         "(ran_at, article_count, cluster_count, output_path, citation_coverage, "
-        " prompt_version, model, status, headline, deck, word_count, body_md) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " prompt_version, model, status, headline, deck, word_count, body_md, "
+        " body_md_raw, article_index_json) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (datetime.now(timezone.utc).isoformat(), n, n_clusters, output_path,
-         coverage, prompt_version, model, status, headline, deck, word_count, body_md),
+         coverage, prompt_version, model, status, headline, deck, word_count, body_md,
+         body_md_raw, article_index_json),
     )
     return cur.lastrowid

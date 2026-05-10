@@ -10,8 +10,8 @@ from clinical_news.llm import gemini
 
 log = logging.getLogger(__name__)
 
-PROMPT_PATH = Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "meta_synthesis_v2.md"
-PROMPT_VERSION = "meta_synthesis_v2"
+PROMPT_PATH = Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "meta_synthesis_v3.md"
+PROMPT_VERSION = "meta_synthesis_v3"
 
 
 def _trim_index(article_index: dict[str, dict]) -> dict[str, dict]:
