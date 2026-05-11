@@ -45,6 +45,11 @@ def summarize_cluster(rows: list[sqlite3.Row], id_for: dict[int, str]) -> dict:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
         log.warning("cluster summary parse failed", extra={"err": str(exc), "raw": raw[:200]})
+        data = None
+    if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+        data = data[0]
+    if not isinstance(data, dict):
+        log.warning("cluster summary wrong shape", extra={"type": type(data).__name__, "raw": raw[:200]})
         data = {"theme": "(parse error)", "key_facts": [], "disagreements": [], "primary_sources": []}
     data["_prompt_version"] = PROMPT_VERSION
     return data
